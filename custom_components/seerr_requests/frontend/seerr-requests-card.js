@@ -3,7 +3,7 @@
  * Shows pending Seerr requests with fanart, who/when, summary, links and
  * Approve / Reject buttons. Served automatically by the seerr_requests integration.
  */
-const CARD_VERSION = "0.2.0";
+const CARD_VERSION = "0.3.0";
 const DOMAIN = "seerr_requests";
 
 const esc = (s) =>
