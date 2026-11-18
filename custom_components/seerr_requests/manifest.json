@@ -1,9 +1,18 @@
 {
   "domain": "seerr_requests",
   "name": "Seerr Requests",
-  "codeowners": ["@AJErazzor"],
+  "categories": [
+    "media_entertainment.tv_streaming"
+  ],
+  "codeowners": [
+    "@AJErazzor"
+  ],
   "config_flow": true,
-  "dependencies": ["frontend", "http", "webhook"],
+  "dependencies": [
+    "frontend",
+    "http",
+    "webhook"
+  ],
   "documentation": "https://github.com/AJErazzor/ha-seerr",
   "integration_type": "service",
   "iot_class": "local_polling",
