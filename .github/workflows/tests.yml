@@ -1,0 +1,49 @@
+name: Tests
+
+# The full test suite: Home Assistant tests (pytest) and the card's browser test (jsdom).
+# Called by validate.yml (every push and pull request) and by release.yml (a release is
+# only published once this passes).
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pytest:
+    name: Pytest
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: requirements_test.txt
+
+      - name: Install test requirements
+        run: pip install -r requirements_test.txt
+
+      - name: Run the tests
+        run: python -m pytest -q -rfEs
+
+  card:
+    name: Card
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install jsdom
+        run: npm install --prefix "$RUNNER_TEMP/js" --no-save --no-audit --no-fund jsdom@24
+
+      - name: Run the card test
+        run: NODE_PATH="$RUNNER_TEMP/js/node_modules" node tests/card.test.mjs

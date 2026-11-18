@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 DOMAIN = "seerr_requests"
-VERSION = "0.1.0"
 
 CONF_EXTERNAL_URL = "external_url"
 CONF_WEBHOOK_ID = "webhook_id"

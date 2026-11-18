@@ -1,0 +1,13 @@
+# What the test suite needs. Python 3.13.
+#
+#   python3.13 -m venv .venv && .venv/bin/pip install -r requirements_test.txt
+#   .venv/bin/python -m pytest -q
+#
+# The card test needs Node and jsdom:
+#   npm install --prefix /tmp/jsdom jsdom@24 && NODE_PATH=/tmp/jsdom/node_modules node tests/card.test.mjs
+#
+# Keep these two in step: home-assistant-frontend must be the version the pinned HA expects.
+
+# HA 2026.2.3, plus pytest, pytest-asyncio, pytest-xdist and pytest-cov
+pytest-homeassistant-custom-component==0.13.316
+home-assistant-frontend==20260128.6

@@ -19,6 +19,7 @@ from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.typing import ConfigType
+from homeassistant.loader import async_get_integration
 
 from .api import SeerrClient
 from .const import (
@@ -30,7 +31,6 @@ from .const import (
     DOMAIN,
     SERVICE_APPROVE,
     SERVICE_DECLINE,
-    VERSION,
 )
 from .coordinator import SeerrCoordinator
 from .notifications import SeerrNotifier
@@ -66,7 +66,9 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     await hass.http.async_register_static_paths(
         [StaticPathConfig(CARD_URL, str(card_path), cache_headers=False)]
     )
-    add_extra_js_url(hass, f"{CARD_URL}?v={VERSION}")
+    # The version (written by the release workflow) makes browsers fetch the new card after an update.
+    version = (await async_get_integration(hass, DOMAIN)).version
+    add_extra_js_url(hass, f"{CARD_URL}?v={version}")
 
     async def handle_action(call: ServiceCall) -> None:
         entry = _resolve_entry(hass, call.data.get(ATTR_CONFIG_ENTRY_ID))
