@@ -1,0 +1,31 @@
+approve:
+  fields:
+    request_id:
+      required: true
+      example: 42
+      selector:
+        number:
+          min: 1
+          max: 100000000
+          mode: box
+    config_entry_id:
+      required: false
+      selector:
+        config_entry:
+          integration: seerr_requests
+
+decline:
+  fields:
+    request_id:
+      required: true
+      example: 42
+      selector:
+        number:
+          min: 1
+          max: 100000000
+          mode: box
+    config_entry_id:
+      required: false
+      selector:
+        config_entry:
+          integration: seerr_requests

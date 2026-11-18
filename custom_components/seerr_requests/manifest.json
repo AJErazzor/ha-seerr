@@ -1,0 +1,13 @@
+{
+  "domain": "seerr_requests",
+  "name": "Seerr Requests",
+  "codeowners": ["@AJErazzor"],
+  "config_flow": true,
+  "dependencies": ["frontend", "http", "webhook"],
+  "documentation": "https://github.com/AJErazzor/ha-seerr",
+  "integration_type": "service",
+  "iot_class": "local_polling",
+  "issue_tracker": "https://github.com/AJErazzor/ha-seerr/issues",
+  "requirements": [],
+  "version": "0.1.0"
+}

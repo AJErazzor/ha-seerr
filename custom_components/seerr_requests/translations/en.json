@@ -1,0 +1,81 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to Seerr",
+        "description": "Works with Seerr, Jellyseerr and Overseerr. Find the API key in Seerr under Settings → General.",
+        "data": {
+          "url": "Seerr URL",
+          "api_key": "API key",
+          "external_url": "External URL (optional)",
+          "verify_ssl": "Verify SSL certificate"
+        },
+        "data_description": {
+          "url": "The address Home Assistant uses to reach Seerr, e.g. http://192.168.1.50:5055",
+          "external_url": "The address you open Seerr at from your phone, e.g. https://seerr.example.com. Used for the Open in Seerr links and user avatars. Leave blank to use the Seerr URL."
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Couldn't reach Seerr at that address.",
+      "invalid_auth": "Seerr rejected the API key.",
+      "invalid_url": "The address must start with http:// or https://",
+      "unknown": "Seerr returned an unexpected error. Check the Home Assistant log."
+    },
+    "abort": {
+      "already_configured": "This Seerr server is already set up."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Seerr Requests options",
+        "description": "**Instant updates (recommended):** in Seerr go to Settings → Notifications → Webhook, turn it on, set the Webhook URL to:\n\n`{webhook_url}`\n\nand tick the notification types you want (at least *Request Pending Approval*). Without this, Home Assistant only checks at the interval below.",
+        "data": {
+          "notify_services": "Send phone notifications to",
+          "scan_interval": "Check Seerr every"
+        },
+        "data_description": {
+          "notify_services": "Each phone gets new requests with Approve and Decline buttons. Leave empty for no notifications."
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "pending_requests": {
+        "name": "Pending requests"
+      }
+    }
+  },
+  "services": {
+    "approve": {
+      "name": "Approve request",
+      "description": "Approves a pending Seerr request.",
+      "fields": {
+        "request_id": {
+          "name": "Request ID",
+          "description": "The Seerr request ID (the id in the sensor's requests list)."
+        },
+        "config_entry_id": {
+          "name": "Seerr server",
+          "description": "Only needed if you have more than one Seerr server set up."
+        }
+      }
+    },
+    "decline": {
+      "name": "Decline request",
+      "description": "Declines a pending Seerr request.",
+      "fields": {
+        "request_id": {
+          "name": "Request ID",
+          "description": "The Seerr request ID (the id in the sensor's requests list)."
+        },
+        "config_entry_id": {
+          "name": "Seerr server",
+          "description": "Only needed if you have more than one Seerr server set up."
+        }
+      }
+    }
+  }
+}
