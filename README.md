@@ -7,8 +7,9 @@ See, approve and reject [Seerr](https://seerr.dev) requests from Home Assistant 
 ## What you get
 
 - **Pending requests sensor** — `sensor.seerr_pending_requests`, the number waiting, with every request (title, year, who, when, poster, fanart, summary, links) in its attributes.
+- **Approved requests sensor** — `sensor.seerr_approved_requests`, approved requests that aren't in your library yet, each with a status: `approved`, `downloading` or `partially_available`, and who approved it.
 - **Phone notifications** with the poster and **Approve / Decline** buttons. Tapping a button does the job; no automations needed. The notification clears itself if the request is handled somewhere else.
-- **Dashboard card** — fanart background (optional), poster, who requested it and when, summary, TMDB / IMDb / TVDB / Open in Seerr links, and Approve / Reject buttons. Reject needs two taps.
+- **Dashboard card** — fanart background (optional), poster, who requested it and when, summary, TMDB / IMDb / TVDB / Open in Seerr links, and Approve / Reject buttons. Reject needs two taps. A second section, **Approved · on its way**, lists approved requests with their status until they're fully available.
 - **Actions** `seerr_requests.approve` and `seerr_requests.decline` for your own automations and scripts.
 - **Events** `seerr_requests_new_request` and `seerr_requests_request_actioned` for your own automations.
 - **Instant updates** through Seerr's webhook, with regular checking as a fallback.
@@ -45,6 +46,9 @@ Add a card → search **Seerr Requests**. Everything can be set in the visual ed
 type: custom:seerr-requests-card
 entity: sensor.seerr_pending_requests
 title: Seerr requests
+show_pending: true    # "Waiting for approval" section
+show_approved: true   # "Approved · on its way" section
+# approved_entity: sensor.seerr_approved_requests   # found automatically
 show_fanart: true     # fanart background; false = compact rows
 show_summary: true    # plot summary, 3 lines with "more"
 show_links: true      # TMDB / IMDb / TVDB / Open in Seerr

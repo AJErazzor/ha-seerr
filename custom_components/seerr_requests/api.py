@@ -73,14 +73,22 @@ class SeerrClient:
         """Request totals by status. Needs a valid API key."""
         return await self._request("GET", "/request/count") or {}
 
-    async def pending_requests(self, take: int = 100) -> list[dict[str, Any]]:
-        """Requests waiting for approval, newest first."""
+    async def requests(self, status_filter: str, take: int = 100) -> list[dict[str, Any]]:
+        """Requests matching a Seerr filter ("pending", "processing", ...), newest first."""
         data = await self._request(
             "GET",
             "/request",
-            params={"take": take, "skip": 0, "filter": "pending", "sort": "added"},
+            params={"take": take, "skip": 0, "filter": status_filter, "sort": "added"},
         )
         return (data or {}).get("results", [])
+
+    async def pending_requests(self, take: int = 100) -> list[dict[str, Any]]:
+        """Requests waiting for approval."""
+        return await self.requests("pending", take)
+
+    async def processing_requests(self, take: int = 100) -> list[dict[str, Any]]:
+        """Approved requests that aren't fully available yet."""
+        return await self.requests("processing", take)
 
     async def media_details(self, media_type: str, tmdb_id: int) -> dict[str, Any]:
         """Movie or TV details (title, overview, artwork, external ids)."""

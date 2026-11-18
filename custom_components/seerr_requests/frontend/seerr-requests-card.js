@@ -47,7 +47,25 @@ function seasonText(seasons) {
 const initials = (name) =>
   String(name || "?").split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join("") || "?";
 
-const DEFAULTS = { title: "Seerr requests", show_fanart: true, show_summary: true, show_links: true, max_items: 0 };
+const DEFAULTS = {
+  title: "Seerr requests",
+  show_pending: true,
+  show_approved: true,
+  show_fanart: true,
+  show_summary: true,
+  show_links: true,
+  max_items: 0,
+};
+
+const STATUS = {
+  approved: { label: "Approved", icon: "mdi:check-circle-outline" },
+  downloading: { label: "Downloading", icon: "mdi:download" },
+  partially_available: { label: "Partially available", icon: "mdi:progress-check" },
+};
+
+// The approved sensor lives next to the pending one unless the card says otherwise.
+const approvedEntityFor = (config) =>
+  config.approved_entity || String(config.entity || "").replace(/pending_requests$/, "approved_requests");
 
 const STYLE = `
   :host { display:block; }
@@ -56,6 +74,14 @@ const STYLE = `
   .header .name { font-size:1.2em; font-weight:500; color:var(--primary-text-color); }
   .count { background:var(--primary-color); color:var(--text-primary-color,#fff); border-radius:12px; padding:2px 10px; font-size:.85em; font-weight:600; }
   .list { display:grid; gap:12px; grid-template-columns:repeat(auto-fill,minmax(min(100%,340px),1fr)); padding:4px 16px 16px; }
+  .section { padding:8px 16px 0; font-size:.8em; font-weight:600; letter-spacing:.04em; text-transform:uppercase;
+             color:var(--secondary-text-color); }
+  .none { padding:0 16px 12px; font-size:.85em; color:var(--secondary-text-color); }
+  .status { display:flex; align-items:center; gap:4px; font-size:.85em; font-weight:600; margin-top:auto; padding-top:4px; }
+  .status ha-icon { --mdc-icon-size:18px; }
+  .status.downloading { color:var(--info-color,#039be5); }
+  .req.fanart.has-bg .status.downloading { color:#7fd3ff; }
+  .status.partially_available { color:var(--warning-color,#ffa600); }
   .empty { padding:8px 16px 24px; text-align:center; color:var(--secondary-text-color); }
   .empty ha-icon { --mdc-icon-size:40px; color:var(--success-color,#4caf50); display:block; margin:0 auto 6px; }
   .warn { padding:16px; color:var(--error-color,#db4437); }
@@ -132,16 +158,21 @@ class SeerrRequestsCard extends HTMLElement {
     if (!config || !config.entity) throw new Error("Choose the Seerr pending requests sensor");
     this._config = { ...DEFAULTS, ...config };
     this._lastState = undefined;
+    this._lastApproved = undefined;
     this._render();
   }
 
   set hass(hass) {
     this._hass = hass;
     const st = hass.states[this._config?.entity];
-    if (st !== this._lastState) {
+    const ap = hass.states[approvedEntityFor(this._config || {})];
+    if (st !== this._lastState || ap !== this._lastApproved) {
       this._lastState = st;
+      this._lastApproved = ap;
       // Forget per-request UI state for requests that are gone.
-      const ids = new Set((st?.attributes?.requests || []).map((r) => r.id));
+      const ids = new Set(
+        [...(st?.attributes?.requests || []), ...(ap?.attributes?.requests || [])].map((r) => r.id)
+      );
       for (const set of [this._expanded, this._exact, this._busy, this._done]) {
         for (const id of [...set]) if (!ids.has(id)) set.delete(id);
       }
@@ -160,7 +191,9 @@ class SeerrRequestsCard extends HTMLElement {
   }
 
   getCardSize() {
-    const n = this._lastState?.attributes?.requests?.length || 0;
+    const n =
+      (this._lastState?.attributes?.requests?.length || 0) +
+      (this._lastApproved?.attributes?.requests?.length || 0);
     return 1 + Math.max(1, n) * (this._config?.show_fanart ? 3 : 2);
   }
 
@@ -211,7 +244,7 @@ class SeerrRequestsCard extends HTMLElement {
     this.dispatchEvent(new CustomEvent("hass-notification", { detail: { message }, bubbles: true, composed: true }));
   }
 
-  _renderRequest(r) {
+  _renderRequest(r, approved = false) {
     const c = this._config;
     const id = Number(r.id);
     const bg = c.show_fanart ? cssUrl(r.backdrop) : "";
@@ -251,17 +284,29 @@ class SeerrRequestsCard extends HTMLElement {
               <div class="summary ${expanded ? "" : "clamp"}">${esc(overview)}</div>
               ${overview.length > 160 ? `<button class="more" data-act="more" data-id="${id}">${expanded ? "less" : "more"}</button>` : ""}` : ""}
             ${links ? `<div class="links">${links}</div>` : ""}
-            <div class="actions">
+            ${approved ? this._renderStatus(r) : `<div class="actions">
               <button class="approve" data-act="approve" data-id="${id}" ${busy ? "disabled" : ""}>
                 <ha-icon icon="mdi:check"></ha-icon>${busy ? "Working…" : "Approve"}
               </button>
               <button class="decline ${confirming ? "confirm" : ""}" data-act="decline" data-id="${id}" ${busy ? "disabled" : ""}>
                 <ha-icon icon="mdi:close"></ha-icon>${confirming ? "Tap again to reject" : "Reject"}
               </button>
-            </div>
+            </div>`}
           </div>
         </div>
       </div>`;
+  }
+
+  _renderStatus(r) {
+    const st = STATUS[r.status] || STATUS.approved;
+    const by = r.approved_by ? ` by ${esc(r.approved_by)}` : "";
+    return `<div class="status ${esc(r.status || "approved")}"><ha-icon icon="${st.icon}"></ha-icon>${st.label}${r.status === "approved" ? by : ""}</div>`;
+  }
+
+  _list(reqs, approved) {
+    const max = this._config.max_items;
+    const shown = max > 0 ? reqs.slice(0, max) : reqs;
+    return `<div class="list">${shown.map((r) => this._renderRequest(r, approved)).join("")}</div>`;
   }
 
   _render() {
@@ -274,13 +319,29 @@ class SeerrRequestsCard extends HTMLElement {
     } else if (!st) {
       body = `<div class="warn">Entity not found: ${esc(c.entity)}</div>`;
     } else {
-      let reqs = Array.isArray(st.attributes?.requests) ? st.attributes.requests : [];
-      if (c.max_items > 0) reqs = reqs.slice(0, c.max_items);
-      body = reqs.length
-        ? `<div class="list">${reqs.map((r) => this._renderRequest(r)).join("")}</div>`
-        : `<div class="empty"><ha-icon icon="mdi:check-circle-outline"></ha-icon>All caught up — no requests waiting</div>`;
+      const pending = Array.isArray(st.attributes?.requests) ? st.attributes.requests : [];
+      const apState = this._lastApproved;
+      const approved = Array.isArray(apState?.attributes?.requests) ? apState.attributes.requests : [];
+      const showPending = c.show_pending !== false;
+      const showApproved = c.show_approved !== false && !!apState;
+      const both = showPending && showApproved;
+      const parts = [];
+      if (showPending) {
+        if (both) parts.push(`<div class="section">Waiting for approval</div>`);
+        if (pending.length) parts.push(this._list(pending, false));
+        else if (both && approved.length) parts.push(`<div class="none">Nothing waiting for approval</div>`);
+      }
+      if (showApproved && approved.length) {
+        if (both) parts.push(`<div class="section">Approved · on its way</div>`);
+        parts.push(this._list(approved, true));
+      }
+      const nothing = (!showPending || !pending.length) && (!showApproved || !approved.length);
+      body = nothing
+        ? `<div class="empty"><ha-icon icon="mdi:check-circle-outline"></ha-icon>All caught up — nothing waiting</div>`
+        : parts.join("");
     }
-    const count = Array.isArray(st?.attributes?.requests) ? st.attributes.requests.length : 0;
+    const count =
+      c.show_pending !== false && Array.isArray(st?.attributes?.requests) ? st.attributes.requests.length : 0;
     this.shadowRoot.innerHTML = `
       <style>${STYLE}</style>
       <ha-card>
@@ -292,7 +353,19 @@ class SeerrRequestsCard extends HTMLElement {
 
 const EDITOR_SCHEMA = [
   { name: "entity", required: true, selector: { entity: { domain: "sensor", integration: DOMAIN } } },
+  {
+    name: "approved_entity",
+    selector: { entity: { domain: "sensor", integration: DOMAIN } },
+  },
   { name: "title", selector: { text: {} } },
+  {
+    type: "grid",
+    name: "",
+    schema: [
+      { name: "show_pending", selector: { boolean: {} } },
+      { name: "show_approved", selector: { boolean: {} } },
+    ],
+  },
   {
     type: "grid",
     name: "",
@@ -307,6 +380,9 @@ const EDITOR_SCHEMA = [
 
 const EDITOR_LABELS = {
   entity: "Pending requests sensor",
+  approved_entity: "Approved requests sensor (optional, found automatically)",
+  show_pending: "Show waiting for approval",
+  show_approved: "Show approved · on its way",
   title: "Title",
   show_fanart: "Show fanart",
   show_summary: "Show summary",

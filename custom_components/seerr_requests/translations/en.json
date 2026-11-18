@@ -45,6 +45,9 @@
     "sensor": {
       "pending_requests": {
         "name": "Pending requests"
+      },
+      "processing_requests": {
+        "name": "Approved requests"
       }
     }
   },

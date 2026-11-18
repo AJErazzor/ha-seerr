@@ -16,7 +16,14 @@ const reqs = [
   { id: 12, type: "tv", title: "Severance", year: "2022", overview: "Short", poster: null, backdrop: "javascript:alert(1)", requested_by: "Sue",
     requested_by_avatar: null, requested_at: new Date(now - 30e3).toISOString(), is4k: true, seasons: [1,2,3], tmdb_url: "https://www.themoviedb.org/tv/2", imdb_url: null, tvdb_url: "https://thetvdb.com/dereferrer/series/3", seerr_url: "https://seerr.example.com/tv/2" },
 ];
-const mkHass = (r) => ({ locale: { language: "en-AU" }, states: { "sensor.seerr_pending_requests": { state: String(r.length), attributes: { requests: r } } },
+const approvedReqs = [
+  { ...reqs[0], id: 20, status: "approved", approved_by: "A.J." },
+  { ...reqs[1], id: 21, status: "downloading", approved_by: "A.J." },
+  { ...reqs[1], id: 22, status: "partially_available" },
+];
+const mkHass = (r, ap = null) => ({ locale: { language: "en-AU" }, states: {
+    "sensor.seerr_pending_requests": { state: String(r.length), attributes: { requests: r } },
+    ...(ap ? { "sensor.seerr_approved_requests": { state: String(ap.length), attributes: { requests: ap } } } : {}) },
   callService: async (d, s, data) => { calls.push([d, s, data]); } });
 const card = w.document.createElement("seerr-requests-card");
 card.setConfig({ entity: "sensor.seerr_pending_requests" });
@@ -49,6 +56,24 @@ ok(sr.textContent.includes("All caught up"), "empty state");
 card.setConfig({ entity: "sensor.seerr_pending_requests", show_fanart: false, show_summary: false, show_links: false });
 card.hass = mkHass(reqs);
 ok(sr.querySelectorAll(".compact").length === 2 && !sr.querySelector(".bg") && !sr.querySelector(".summary") && !sr.querySelector(".links"), "options off");
+card.setConfig({ entity: "sensor.seerr_pending_requests" });
+card.hass = mkHass(reqs, approvedReqs);
+ok(sr.querySelectorAll(".req").length === 5, "pending + approved rendered");
+ok(sr.textContent.includes("Waiting for approval") && sr.textContent.includes("Approved · on its way"), "section headings");
+ok(sr.querySelectorAll(".actions").length === 2, "only pending have buttons");
+ok(sr.textContent.includes("Approved by A.J.") && sr.textContent.includes("Downloading") && sr.textContent.includes("Partially available"), "status badges");
+ok(sr.querySelector(".count").textContent === "2", "count is pending only");
+card.hass = mkHass([], approvedReqs);
+ok(sr.textContent.includes("Nothing waiting for approval") && sr.querySelectorAll(".req").length === 3, "no pending, approved shown");
+card.setConfig({ entity: "sensor.seerr_pending_requests", show_pending: false });
+card.hass = mkHass(reqs, approvedReqs);
+ok(sr.querySelectorAll(".req").length === 3 && !sr.querySelector(".section") && !sr.querySelector(".actions"), "approved-only card");
+card.setConfig({ entity: "sensor.seerr_pending_requests", show_approved: false });
+card.hass = mkHass(reqs, approvedReqs);
+ok(sr.querySelectorAll(".req").length === 2 && !sr.querySelector(".section"), "pending-only card");
+card.setConfig({ entity: "sensor.seerr_pending_requests" });
+card.hass = mkHass([], []);
+ok(sr.textContent.includes("All caught up"), "both empty");
 const ed = w.document.createElement("seerr-requests-card-editor");
 ed.setConfig({ entity: "x" }); ed.hass = mkHass([]);
 ok(ed.querySelector("ha-form") && ed.querySelector("ha-form").data.show_fanart === true, "editor defaults");

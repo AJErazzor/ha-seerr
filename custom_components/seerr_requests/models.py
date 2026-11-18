@@ -7,6 +7,12 @@ from typing import Any
 
 TMDB_IMAGE = "https://image.tmdb.org/t/p"
 
+# Seerr status codes
+REQUEST_PENDING = 1
+REQUEST_APPROVED = 2
+MEDIA_PROCESSING = 3
+MEDIA_PARTIALLY_AVAILABLE = 4
+
 
 def _image(path: str | None, size: str) -> str | None:
     if not path:
@@ -36,6 +42,32 @@ def season_text(seasons: list[int]) -> str:
     return "Seasons " + ", ".join(str(s) for s in seasons)
 
 
+def _user_name(user: dict[str, Any] | None) -> str | None:
+    if not user:
+        return None
+    return (
+        user.get("displayName")
+        or user.get("username")
+        or user.get("jellyfinUsername")
+        or user.get("plexUsername")
+        or user.get("email")
+    )
+
+
+def request_status(raw: dict[str, Any]) -> str:
+    """pending, approved, downloading or partially_available."""
+    if raw.get("status") == REQUEST_PENDING:
+        return "pending"
+    media = raw.get("media") or {}
+    is4k = bool(raw.get("is4k"))
+    media_status = media.get("status4k" if is4k else "status")
+    if media_status == MEDIA_PARTIALLY_AVAILABLE:
+        return "partially_available"
+    if media.get("downloadStatus4k" if is4k else "downloadStatus"):
+        return "downloading"
+    return "approved"
+
+
 def build_request(
     raw: dict[str, Any], details: dict[str, Any], external_url: str
 ) -> dict[str, Any]:
@@ -53,14 +85,7 @@ def build_request(
     tvdb_id = external_ids.get("tvdbId") or media.get("tvdbId")
 
     user = raw.get("requestedBy") or {}
-    requested_by = (
-        user.get("displayName")
-        or user.get("username")
-        or user.get("jellyfinUsername")
-        or user.get("plexUsername")
-        or user.get("email")
-        or "Unknown"
-    )
+    requested_by = _user_name(user) or "Unknown"
 
     seasons = sorted(
         s["seasonNumber"]
@@ -71,6 +96,7 @@ def build_request(
     kind = "tv" if media_type == "tv" else "movie"
     return {
         "id": raw.get("id"),
+        "status": request_status(raw),
         "type": kind,
         "title": title,
         "year": year,
@@ -80,6 +106,9 @@ def build_request(
         "requested_by": requested_by,
         "requested_by_avatar": _absolute(external_url, user.get("avatar")),
         "requested_at": raw.get("createdAt"),
+        "approved_by": (
+            _user_name(raw.get("modifiedBy")) if raw.get("status") == REQUEST_APPROVED else None
+        ),
         "is4k": bool(raw.get("is4k")),
         "seasons": seasons if kind == "tv" else [],
         "tmdb_id": tmdb_id,

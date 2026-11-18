@@ -22,6 +22,3 @@ SERVICE_APPROVE = "approve"
 SERVICE_DECLINE = "decline"
 ATTR_REQUEST_ID = "request_id"
 ATTR_CONFIG_ENTRY_ID = "config_entry_id"
-
-# Seerr request status codes
-REQUEST_STATUS_PENDING = 1

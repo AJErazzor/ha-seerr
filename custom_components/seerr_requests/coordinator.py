@@ -20,9 +20,8 @@ from .const import (
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
     EVENT_REQUEST_ACTIONED,
-    REQUEST_STATUS_PENDING,
 )
-from .models import build_request
+from .models import REQUEST_APPROVED, REQUEST_PENDING, build_request
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -32,6 +31,7 @@ class SeerrData:
     """What one refresh returns."""
 
     pending: list[dict[str, Any]] = field(default_factory=list)
+    processing: list[dict[str, Any]] = field(default_factory=list)
     counts: dict[str, Any] = field(default_factory=dict)
     version: str | None = None
 
@@ -61,14 +61,30 @@ class SeerrCoordinator(DataUpdateCoordinator[SeerrData]):
             if self._version is None:
                 self._version = (await self.client.status()).get("version")
             counts = await self.client.request_count()
-            raw_requests = await self.client.pending_requests()
+            raw_pending = await self.client.pending_requests()
+            raw_processing = await self.client.processing_requests()
         except SeerrError as err:
             raise UpdateFailed(str(err)) from err
 
-        pending: list[dict[str, Any]] = []
         seen: set[tuple[str, int]] = set()
-        for raw in raw_requests:
-            if raw.get("status") != REQUEST_STATUS_PENDING:
+        pending = await self._build_all(raw_pending, REQUEST_PENDING, seen)
+        processing = await self._build_all(raw_processing, REQUEST_APPROVED, seen)
+
+        # Forget artwork/details for requests that are no longer listed.
+        for key in list(self._details_cache):
+            if key not in seen:
+                del self._details_cache[key]
+
+        return SeerrData(
+            pending=pending, processing=processing, counts=counts, version=self._version
+        )
+
+    async def _build_all(
+        self, raws: list[dict[str, Any]], status: int, seen: set[tuple[str, int]]
+    ) -> list[dict[str, Any]]:
+        built: list[dict[str, Any]] = []
+        for raw in raws:
+            if raw.get("status") != status:
                 continue
             media = raw.get("media") or {}
             media_type = "tv" if (raw.get("type") or media.get("mediaType")) == "tv" else "movie"
@@ -86,14 +102,8 @@ class SeerrCoordinator(DataUpdateCoordinator[SeerrData]):
                         _LOGGER.debug("Could not load details for %s: %s", key, err)
                         self._details_cache[key] = {}
                 details = self._details_cache[key]
-            pending.append(build_request(raw, details, self.external_url))
-
-        # Forget artwork/details for requests that are no longer pending.
-        for key in list(self._details_cache):
-            if key not in seen:
-                del self._details_cache[key]
-
-        return SeerrData(pending=pending, counts=counts, version=self._version)
+            built.append(build_request(raw, details, self.external_url))
+        return built
 
     def find(self, request_id: int) -> dict[str, Any] | None:
         """A pending request by id, if we have it."""

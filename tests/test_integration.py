@@ -34,11 +34,28 @@ TV = {"name": "Severance", "firstAirDate": "2022-02-17", "overview": "Mark...",
       "posterPath": "/s.jpg", "backdropPath": "/sb.jpg", "externalIds": {"tvdbId": 371980, "imdbId": "tt11280740"}}
 
 
-def mock_api(aioclient_mock, pending):
+REQ_APPROVED = {
+    "id": 20, "status": 2, "type": "movie", "is4k": False,
+    "createdAt": "2026-11-17T08:00:00.000Z",
+    "media": {"tmdbId": 693134, "mediaType": "movie", "status": 3, "downloadStatus": []},
+    "requestedBy": {"displayName": "Bob"}, "modifiedBy": {"displayName": "A.J."},
+}
+REQ_DOWNLOADING = {
+    "id": 21, "status": 2, "type": "tv", "is4k": False,
+    "createdAt": "2026-11-17T09:00:00.000Z",
+    "media": {"tmdbId": 95396, "mediaType": "tv", "status": 3, "downloadStatus": [{"size": 10, "sizeLeft": 5}]},
+    "requestedBy": {"displayName": "Sue"}, "modifiedBy": {"displayName": "A.J."},
+    "seasons": [{"seasonNumber": 1}],
+}
+REQ_PARTIAL = {**REQ_DOWNLOADING, "id": 22, "media": {**REQ_DOWNLOADING["media"], "status": 4, "downloadStatus": []}}
+
+
+def mock_api(aioclient_mock, pending, processing=()):
     aioclient_mock.clear_requests()
     aioclient_mock.get(f"{API}/status", json={"version": "3.5.2"})
     aioclient_mock.get(f"{API}/request/count", json={"total": 5, "pending": len(pending), "approved": 3})
-    aioclient_mock.get(f"{API}/request", json={"pageInfo": {}, "results": pending})
+    aioclient_mock.get(f"{API}/request?filter=pending", json={"pageInfo": {}, "results": pending})
+    aioclient_mock.get(f"{API}/request?filter=processing", json={"pageInfo": {}, "results": list(processing)})
     aioclient_mock.get(f"{API}/movie/693134", json=MOVIE)
     aioclient_mock.get(f"{API}/tv/95396", json=TV)
     aioclient_mock.post(f"{API}/request/11/approve", json={"id": 11, "status": 2})
@@ -78,7 +95,7 @@ async def test_config_flow_bad_key(hass: HomeAssistant, aioclient_mock):
 
 
 async def test_sensor_and_actions(hass: HomeAssistant, aioclient_mock):
-    mock_api(aioclient_mock, [REQ_MOVIE, REQ_TV])
+    mock_api(aioclient_mock, [REQ_MOVIE, REQ_TV], [REQ_APPROVED, REQ_DOWNLOADING, REQ_PARTIAL, REQ_MOVIE])
     entry = make_entry(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
@@ -94,6 +111,16 @@ async def test_sensor_and_actions(hass: HomeAssistant, aioclient_mock):
     assert movie["seerr_url"] == "https://seerr.example.com/movie/693134"
     assert movie["imdb_url"].endswith("tt15239678/") and movie["tvdb_url"] is None
     assert tv["seasons"] == [1, 2] and tv["is4k"] and tv["tvdb_url"].endswith("371980")
+    assert movie["status"] == "pending" and movie["approved_by"] is None
+
+    approved = hass.states.get("sensor.seerr_approved_requests")
+    assert approved is not None, hass.states.async_entity_ids()
+    # A pending request that slipped into the processing list is ignored.
+    assert approved.state == "3"
+    a, d, p = approved.attributes["requests"]
+    assert (a["status"], a["approved_by"], a["title"]) == ("approved", "A.J.", "Dune: Part Two")
+    assert d["status"] == "downloading" and d["title"] == "Severance"
+    assert p["status"] == "partially_available"
 
     events = []
     hass.bus.async_listen(f"{DOMAIN}_request_actioned", lambda e: events.append(e))
