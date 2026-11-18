@@ -189,3 +189,26 @@ async def test_options_flow(hass: HomeAssistant, aioclient_mock):
         result["flow_id"], {CONF_NOTIFY_SERVICES: ["notify.mobile_app_pixel"], "scan_interval": 30})
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert entry.options["scan_interval"] == 30
+
+
+def test_brand_images():
+    """The Seerr icon and logos ship inside the integration (HA 2026.3+ shows them)."""
+    from pathlib import Path
+
+    from PIL import Image
+
+    brand = Path(__file__).parent.parent / "custom_components" / DOMAIN / "brand"
+    sizes = {
+        "icon.png": (256, 256),
+        "icon@2x.png": (512, 512),
+        "logo.png": (None, 256),
+        "logo@2x.png": (None, 512),
+        "dark_logo.png": (None, 256),
+        "dark_logo@2x.png": (None, 512),
+    }
+    for name, (width, height) in sizes.items():
+        with Image.open(brand / name) as im:
+            assert im.mode == "RGBA", name
+            assert im.height == height, name
+            if width:
+                assert im.width == width, name

@@ -32,5 +32,5 @@ jobs:
       - uses: hacs/action@main
         with:
           category: integration
-          # Remove "brands" once brand images ship in custom_components/seerr_requests/brand/
+          # brand images ship inside the integration (custom_components/seerr_requests/brand/)
           ignore: brands
