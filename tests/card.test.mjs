@@ -71,9 +71,24 @@ ok(sr.querySelectorAll(".req").length === 3 && !sr.querySelector(".section") && 
 card.setConfig({ entity: "sensor.seerr_pending_requests", show_approved: false });
 card.hass = mkHass(reqs, approvedReqs);
 ok(sr.querySelectorAll(".req").length === 2 && !sr.querySelector(".section"), "pending-only card");
+// Card mistakenly pointed at the APPROVED sensor: requests still land in the right sections,
+// and approved ones never get Approve / Reject.
+card.setConfig({ entity: "sensor.seerr_approved_requests" });
+card.hass = mkHass(reqs.map((r) => ({ ...r, status: "pending" })), approvedReqs);
+ok(sr.querySelectorAll(".req").length === 5, "approved-sensor card shows both lists");
+ok(sr.querySelectorAll(".actions").length === 2 && sr.querySelector(".count").textContent === "2", "buttons only on pending (approved-sensor card)");
+// A request that is in both sensors (stale overlap) appears once, in its real section.
+const dup = { ...approvedReqs[0], id: 11, status: "approved" };
+card.setConfig({ entity: "sensor.seerr_pending_requests" });
+card.hass = mkHass([{ ...reqs[0], status: "approved" }, { ...reqs[1], status: "pending" }], [dup]);
+ok(sr.querySelectorAll(".req").length === 2 && sr.querySelectorAll(".actions").length === 1, "approved request never offered Approve");
 card.setConfig({ entity: "sensor.seerr_pending_requests" });
 card.hass = mkHass([], []);
 ok(sr.textContent.includes("All caught up"), "both empty");
+const stub = w.customElements.get("seerr-requests-card").getStubConfig({ states: {
+  "sensor.seerr_approved_requests": { attributes: { kind: "approved", requests: [] } },
+  "sensor.seerr_pending_requests": { attributes: { kind: "pending", requests: [] } } } });
+ok(stub.entity === "sensor.seerr_pending_requests", "new card picks the pending sensor");
 const ed = w.document.createElement("seerr-requests-card-editor");
 ed.setConfig({ entity: "x" }); ed.hass = mkHass([]);
 ok(ed.querySelector("ha-form") && ed.querySelector("ha-form").data.show_fanart === true, "editor defaults");

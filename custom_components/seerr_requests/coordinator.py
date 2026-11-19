@@ -13,7 +13,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .api import SeerrClient, SeerrError
+from .api import SeerrAlreadyHandledError, SeerrClient, SeerrError
 from .const import (
     CONF_EXTERNAL_URL,
     CONF_SCAN_INTERVAL,
@@ -24,6 +24,10 @@ from .const import (
 from .models import REQUEST_APPROVED, REQUEST_PENDING, build_request
 
 _LOGGER = logging.getLogger(__name__)
+
+
+class AlreadyHandled(HomeAssistantError):
+    """Seerr says the request was already approved or declined."""
 
 
 @dataclass
@@ -106,10 +110,13 @@ class SeerrCoordinator(DataUpdateCoordinator[SeerrData]):
         return built
 
     def find(self, request_id: int) -> dict[str, Any] | None:
-        """A pending request by id, if we have it."""
+        """A pending or approved request by id, if we have it."""
         if not self.data:
             return None
-        return next((r for r in self.data.pending if r["id"] == request_id), None)
+        return next(
+            (r for r in [*self.data.pending, *self.data.processing] if r["id"] == request_id),
+            None,
+        )
 
     async def async_act(self, request_id: int, action: str, source: str = "service") -> str:
         """Approve or decline a request. Returns the title for messages."""
@@ -122,6 +129,10 @@ class SeerrCoordinator(DataUpdateCoordinator[SeerrData]):
                 await self.client.decline(request_id)
             else:
                 raise HomeAssistantError(f"Unknown action {action}")
+        except SeerrAlreadyHandledError as err:
+            # Someone already dealt with it (in Seerr, or auto-approve). Refresh so it drops off.
+            await self.async_request_refresh()
+            raise AlreadyHandled(f"{title} was already approved or declined in Seerr") from err
         except SeerrError as err:
             raise HomeAssistantError(f"Couldn't {action} {title}: {err}") from err
 

@@ -60,6 +60,11 @@ def mock_api(aioclient_mock, pending, processing=()):
     aioclient_mock.get(f"{API}/tv/95396", json=TV)
     aioclient_mock.post(f"{API}/request/11/approve", json={"id": 11, "status": 2})
     aioclient_mock.post(f"{API}/request/12/decline", json={"id": 12, "status": 3})
+    aioclient_mock.post(
+        f"{API}/request/20/approve",
+        status=409,
+        json={"message": "Only pending requests can be approved or declined."},
+    )
 
 
 def make_entry(hass, options=None):
@@ -121,6 +126,14 @@ async def test_sensor_and_actions(hass: HomeAssistant, aioclient_mock):
     assert (a["status"], a["approved_by"], a["title"]) == ("approved", "A.J.", "Dune: Part Two")
     assert d["status"] == "downloading" and d["title"] == "Severance"
     assert p["status"] == "partially_available"
+    assert state.attributes["kind"] == "pending" and approved.attributes["kind"] == "approved"
+
+    # Approving something Seerr has already handled isn't an error: the list just refreshes.
+    calls_before = len(aioclient_mock.mock_calls)
+    await hass.services.async_call(DOMAIN, "approve", {"request_id": 20}, blocking=True)
+    await hass.async_block_till_done()
+    assert any(str(c[1]).endswith("/request?filter=pending") or "filter=pending" in str(c[1])
+               for c in aioclient_mock.mock_calls[calls_before:])
 
     events = []
     hass.bus.async_listen(f"{DOMAIN}_request_actioned", lambda e: events.append(e))

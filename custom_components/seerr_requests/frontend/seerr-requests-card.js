@@ -63,9 +63,18 @@ const STATUS = {
   partially_available: { label: "Partially available", icon: "mdi:progress-check" },
 };
 
-// The approved sensor lives next to the pending one unless the card says otherwise.
-const approvedEntityFor = (config) =>
-  config.approved_entity || String(config.entity || "").replace(/pending_requests$/, "approved_requests");
+// The card reads both Seerr sensors (pending and approved), whichever one it's pointed at, and
+// sorts every request by its own status. So Approve / Reject only ever appear on requests that
+// Seerr says are pending, even if the card is set to the approved sensor.
+const siblingOf = (id) => {
+  const s = String(id || "");
+  if (s.endsWith("pending_requests")) return s.replace(/pending_requests$/, "approved_requests");
+  if (s.endsWith("approved_requests")) return s.replace(/approved_requests$/, "pending_requests");
+  return null;
+};
+const sourceEntities = (config) =>
+  [...new Set([config.entity, config.approved_entity || siblingOf(config.entity)].filter(Boolean))];
+const isPending = (r) => (r.status ? r.status === "pending" : true);
 
 const STYLE = `
   :host { display:block; }
@@ -148,31 +157,31 @@ class SeerrRequestsCard extends HTMLElement {
   }
 
   static getStubConfig(hass) {
-    const entity = Object.keys(hass?.states || {}).find(
+    const ids = Object.keys(hass?.states || {}).filter(
       (id) => id.startsWith("sensor.") && Array.isArray(hass.states[id].attributes?.requests)
     );
+    const entity =
+      ids.find((id) => hass.states[id].attributes?.kind === "pending") ||
+      ids.find((id) => id.endsWith("pending_requests")) ||
+      ids[0];
     return { entity: entity || "sensor.seerr_pending_requests" };
   }
 
   setConfig(config) {
     if (!config || !config.entity) throw new Error("Choose the Seerr pending requests sensor");
     this._config = { ...DEFAULTS, ...config };
-    this._lastState = undefined;
-    this._lastApproved = undefined;
+    this._states = undefined;
     this._render();
   }
 
   set hass(hass) {
     this._hass = hass;
-    const st = hass.states[this._config?.entity];
-    const ap = hass.states[approvedEntityFor(this._config || {})];
-    if (st !== this._lastState || ap !== this._lastApproved) {
-      this._lastState = st;
-      this._lastApproved = ap;
+    if (!this._config) return;
+    const states = sourceEntities(this._config).map((id) => hass.states[id]);
+    if (!this._states || states.some((st, i) => st !== this._states[i])) {
+      this._states = states;
       // Forget per-request UI state for requests that are gone.
-      const ids = new Set(
-        [...(st?.attributes?.requests || []), ...(ap?.attributes?.requests || [])].map((r) => r.id)
-      );
+      const ids = new Set(this._allRequests().map((r) => r.id));
       for (const set of [this._expanded, this._exact, this._busy, this._done]) {
         for (const id of [...set]) if (!ids.has(id)) set.delete(id);
       }
@@ -190,10 +199,19 @@ class SeerrRequestsCard extends HTMLElement {
     this._confirm.clear();
   }
 
+  // Every request from both sensors, once each (newest data wins).
+  _allRequests() {
+    const byId = new Map();
+    for (const st of this._states || []) {
+      for (const r of Array.isArray(st?.attributes?.requests) ? st.attributes.requests : []) {
+        if (r && r.id != null) byId.set(r.id, r);
+      }
+    }
+    return [...byId.values()];
+  }
+
   getCardSize() {
-    const n =
-      (this._lastState?.attributes?.requests?.length || 0) +
-      (this._lastApproved?.attributes?.requests?.length || 0);
+    const n = this._allRequests().length;
     return 1 + Math.max(1, n) * (this._config?.show_fanart ? 3 : 2);
   }
 
@@ -245,6 +263,7 @@ class SeerrRequestsCard extends HTMLElement {
   }
 
   _renderRequest(r, approved = false) {
+    approved = approved || !isPending(r); // never offer Approve on something Seerr has already handled
     const c = this._config;
     const id = Number(r.id);
     const bg = c.show_fanart ? cssUrl(r.backdrop) : "";
@@ -312,18 +331,18 @@ class SeerrRequestsCard extends HTMLElement {
   _render() {
     if (!this._config) return;
     const c = this._config;
-    const st = this._lastState;
     let body;
+    let pending = [];
     if (!this._hass) {
       body = "";
-    } else if (!st) {
+    } else if (!this._states?.[0]) {
       body = `<div class="warn">Entity not found: ${esc(c.entity)}</div>`;
     } else {
-      const pending = Array.isArray(st.attributes?.requests) ? st.attributes.requests : [];
-      const apState = this._lastApproved;
-      const approved = Array.isArray(apState?.attributes?.requests) ? apState.attributes.requests : [];
+      const all = this._allRequests();
+      pending = all.filter(isPending);
+      const approved = all.filter((r) => !isPending(r));
       const showPending = c.show_pending !== false;
-      const showApproved = c.show_approved !== false && !!apState;
+      const showApproved = c.show_approved !== false;
       const both = showPending && showApproved;
       const parts = [];
       if (showPending) {
@@ -340,8 +359,7 @@ class SeerrRequestsCard extends HTMLElement {
         ? `<div class="empty"><ha-icon icon="mdi:check-circle-outline"></ha-icon>All caught up — nothing waiting</div>`
         : parts.join("");
     }
-    const count =
-      c.show_pending !== false && Array.isArray(st?.attributes?.requests) ? st.attributes.requests.length : 0;
+    const count = c.show_pending !== false ? pending.length : 0;
     this.shadowRoot.innerHTML = `
       <style>${STYLE}</style>
       <ha-card>

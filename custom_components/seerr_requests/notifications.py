@@ -12,7 +12,7 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.storage import Store
 
 from .const import CONF_NOTIFY_SERVICES, DOMAIN, EVENT_NEW_REQUEST
-from .coordinator import SeerrCoordinator
+from .coordinator import AlreadyHandled, SeerrCoordinator
 from .models import season_text
 
 _LOGGER = logging.getLogger(__name__)
@@ -161,6 +161,8 @@ class SeerrNotifier:
                 request_id, verb.lower(), source="notification"
             )
             message = f"✅ Approved: {title}" if verb == "APPROVE" else f"❌ Declined: {title}"
+        except AlreadyHandled as err:
+            message = str(err)
         except HomeAssistantError as err:
             self._keep.discard(request_id)
             message = str(err)

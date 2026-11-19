@@ -32,7 +32,7 @@ from .const import (
     SERVICE_APPROVE,
     SERVICE_DECLINE,
 )
-from .coordinator import SeerrCoordinator
+from .coordinator import AlreadyHandled, SeerrCoordinator
 from .notifications import SeerrNotifier
 
 _LOGGER = logging.getLogger(__name__)
@@ -72,7 +72,13 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
     async def handle_action(call: ServiceCall) -> None:
         entry = _resolve_entry(hass, call.data.get(ATTR_CONFIG_ENTRY_ID))
-        await entry.runtime_data.coordinator.async_act(call.data[ATTR_REQUEST_ID], call.service)
+        try:
+            await entry.runtime_data.coordinator.async_act(
+                call.data[ATTR_REQUEST_ID], call.service
+            )
+        except AlreadyHandled as err:
+            # Nothing left to do, so not an error; the refresh removes it from the card.
+            _LOGGER.info("%s", err)
 
     for service in (SERVICE_APPROVE, SERVICE_DECLINE):
         hass.services.async_register(DOMAIN, service, handle_action, schema=SERVICE_SCHEMA)

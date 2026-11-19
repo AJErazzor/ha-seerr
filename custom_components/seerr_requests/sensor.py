@@ -46,6 +46,7 @@ class SeerrRequestsSensor(CoordinatorEntity[SeerrCoordinator], SensorEntity):
         )
 
     _key = ""
+    _key_label = ""
 
     def _requests(self) -> list[dict[str, Any]]:
         return getattr(self.coordinator.data, self._key) if self.coordinator.data else []
@@ -59,13 +60,18 @@ class SeerrRequestsSensor(CoordinatorEntity[SeerrCoordinator], SensorEntity):
         data = self.coordinator.data
         if not data:
             return {}
-        return {"requests": self._requests(), "seerr_url": self.coordinator.external_url}
+        return {
+            "kind": self._key_label,
+            "requests": self._requests(),
+            "seerr_url": self.coordinator.external_url,
+        }
 
 
 class SeerrPendingSensor(SeerrRequestsSensor):
     """Requests waiting for approval; also carries Seerr's request totals."""
 
     _key = "pending"
+    _key_label = "pending"
     _attr_translation_key = "pending_requests"
     _attr_icon = "mdi:movie-open-plus"
 
@@ -76,6 +82,7 @@ class SeerrPendingSensor(SeerrRequestsSensor):
             return {}
         counts = data.counts or {}
         return {
+            "kind": self._key_label,
             "requests": data.pending,
             "seerr_url": self.coordinator.external_url,
             "total": counts.get("total"),
@@ -90,5 +97,6 @@ class SeerrProcessingSensor(SeerrRequestsSensor):
     """Approved requests that aren't fully in the library yet."""
 
     _key = "processing"
+    _key_label = "approved"
     _attr_translation_key = "processing_requests"
     _attr_icon = "mdi:progress-download"

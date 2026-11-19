@@ -23,6 +23,10 @@ class SeerrConnectionError(SeerrError):
     """Seerr could not be reached."""
 
 
+class SeerrAlreadyHandledError(SeerrError):
+    """The request was already approved or declined (Seerr answers HTTP 409)."""
+
+
 class SeerrClient:
     """Talks to one Seerr server."""
 
@@ -50,6 +54,8 @@ class SeerrClient:
                 ) as resp:
                     if resp.status in (401, 403):
                         raise SeerrAuthError("Seerr rejected the API key")
+                    if resp.status == 409:
+                        raise SeerrAlreadyHandledError(await resp.text())
                     if resp.status >= 400:
                         text = await resp.text()
                         raise SeerrError(f"Seerr returned HTTP {resp.status}: {text[:200]}")
