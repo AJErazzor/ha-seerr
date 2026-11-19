@@ -32,5 +32,3 @@ jobs:
       - uses: hacs/action@main
         with:
           category: integration
-          # brand images ship inside the integration (custom_components/seerr_requests/brand/)
-          ignore: brands

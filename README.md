@@ -2,7 +2,7 @@
 
 See, approve and reject [Seerr](https://seerr.dev) requests from Home Assistant — on a dashboard card or straight from a phone notification. Works with Seerr 3.x, Jellyseerr and Overseerr.
 
-[![Open your Home Assistant instance and open this repository in HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=AJErazzor&repository=ha-seerr&category=integration)
+[![Open your Home Assistant instance and open this repository in the Marketplace.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=AJErazzor&repository=ha-seerr&category=integration)
 
 ## What you get
 
@@ -16,9 +16,19 @@ See, approve and reject [Seerr](https://seerr.dev) requests from Home Assistant 
 
 ## Install
 
+**Home Assistant 2026.11 or newer (Marketplace):**
+
+1. **Settings → Marketplace → Add from link**, paste `https://github.com/AJErazzor/ha-seerr`, and install **Seerr Requests**. (Or use the button above.)
+2. If the Marketplace asks for a restart, do it from **Settings → System → Repairs**.
+
+**Older Home Assistant (HACS):**
+
 1. HACS → ⋮ → **Custom repositories** → add `https://github.com/AJErazzor/ha-seerr`, type **Integration**.
 2. Search HACS for **Seerr Requests**, download it, and restart Home Assistant.
-3. **Settings → Devices & services → Add integration → Seerr Requests.**
+
+Then:
+
+1. **Settings → Devices & services → Add integration → Seerr Requests.**
    - **Seerr URL**: how Home Assistant reaches Seerr, e.g. `http://192.168.1.50:5055`
    - **API key**: Seerr → Settings → General
    - **External URL** (optional): the address you use on your phone, e.g. `https://seerr.example.com`. Used for "Open in Seerr" links and avatars.
